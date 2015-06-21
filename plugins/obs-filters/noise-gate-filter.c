@@ -1,7 +1,7 @@
 #include <obs-module.h>
 #include <math.h>
 
-#ifdef _WIN32
+#ifdef _MSC_VER
 #include <float.h>
 
 #ifndef finite
