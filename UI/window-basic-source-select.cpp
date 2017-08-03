@@ -126,7 +126,7 @@ static void AddExisting(const char *name, bool visible, bool duplicate)
 		if (duplicate) {
 			obs_source_t *from = source;
 			char *new_name = get_new_source_name(name);
-			source = obs_source_duplicate(from, new_name, false);
+			source = obs_source_duplicate_ignore(from, new_name, false, true);
 			bfree(new_name);
 			obs_source_release(from);
 

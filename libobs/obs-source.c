@@ -426,7 +426,14 @@ void obs_source_copy_filters(obs_source_t *dst, obs_source_t *src)
 }
 
 obs_source_t *obs_source_duplicate(obs_source_t *source,
-		const char *new_name, bool create_private)
+	const char *new_name, bool create_private)
+{
+	return obs_source_duplicate_ignore(source, new_name, create_private, false);
+}
+
+obs_source_t *obs_source_duplicate_ignore(obs_source_t *source,
+		const char *new_name, bool create_private,
+		bool ignore_duplicate)
 {
 	obs_source_t *new_source;
 	obs_data_t *settings;
@@ -434,7 +441,7 @@ obs_source_t *obs_source_duplicate(obs_source_t *source,
 	if (!obs_source_valid(source, "obs_source_duplicate"))
 		return NULL;
 
-	if ((source->info.output_flags & OBS_SOURCE_DO_NOT_DUPLICATE) != 0) {
+	if ((source->info.output_flags & OBS_SOURCE_DO_NOT_DUPLICATE) != 0 && !ignore_duplicate) {
 		obs_source_addref(source);
 		return source;
 	}
