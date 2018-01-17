@@ -4,6 +4,10 @@
 #include <libavutil/log.h>
 #include <libavcodec/avcodec.h>
 #include <pthread.h>
+#include "dynlink_cuda.h"
+#include "nvEncodeAPI.h"
+
+#define NVENC_CAP 0x30
 
 OBS_DECLARE_MODULE()
 OBS_MODULE_USE_DEFAULT_LOCALE("obs-ffmpeg", "en-US")
@@ -116,10 +120,14 @@ cleanup:
 	destroy_log_context(log_context);
 }
 
+static const char *nvenc_check_name = "nvenc_check";
+
 static bool nvenc_supported(void)
 {
+	profile_start(nvenc_check_name);
 	AVCodec *nvenc = avcodec_find_encoder_by_name("nvenc_h264");
 	void *lib = NULL;
+	void *cudalib = NULL;
 
 	if (!nvenc)
 		return false;
@@ -130,11 +138,54 @@ static bool nvenc_supported(void)
 	} else {
 		lib = os_dlopen("nvEncodeAPI.dll");
 	}
+	cudalib = os_dlopen("nvcuda.dll");
 #else
 	lib = os_dlopen("libnvidia-encode.so.1");
 #endif
+	if (!lib || !cudalib)
+		return false;
+
+	bool success = false;
+
+	tcuDeviceGet *cuDeviceGet = NULL;
+	tcuDeviceComputeCapability *cuDeviceComputeCapability = NULL;
+	tcuInit *cuInit = NULL;
+	
+	CUdevice device;
+	CUresult result;
+
+	cuInit = os_dlsym(cudalib, "cuInit");
+	cuDeviceGet = os_dlsym(cudalib, "cuDeviceGet");
+	cuDeviceComputeCapability = os_dlsym(cudalib, "cuDeviceComputeCapability");
+	
+
+	result = cuInit(0);
+	if (result != CUDA_SUCCESS) {
+		goto cleanup;
+	}
+
+	result = cuDeviceGet(&device, 0);
+	if (result != CUDA_SUCCESS) {
+		goto cleanup;
+	}
+
+	int major, minor;
+	result = cuDeviceComputeCapability(&major, &minor, device);
+	if (result != CUDA_SUCCESS) {
+		goto cleanup;
+	}
+
+	if (((major << 4) | minor) < NVENC_CAP) {
+		goto cleanup;
+	}
+
+	success = true;
+
+cleanup:
 	os_dlclose(lib);
-	return !!lib;
+	os_dlclose(cudalib);
+	profile_end(nvenc_check_name);
+	return success;
 }
 
 bool obs_module_load(void)
